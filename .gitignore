@@ -1,0 +1,8 @@
+# 忽略.vs/games_101_assignments文件夹
+.vs/games_101_assignments/
+
+# 忽略games_10.B46A1EA0文件夹
+games_10.B46A1EA0/
+
+# 忽略x64文件夹
+x64/
