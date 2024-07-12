@@ -25,8 +25,8 @@ Eigen::Matrix4f get_model_matrix(float rotation_angle)
 
     Eigen::Matrix4f rotation_matrix;
 
-    float sin_angle = std::sin(rotation_angle);
-    float cos_angle = std::cos(rotation_angle);
+    float sin_angle = std::sin(rotation_angle * MY_PI / 180);
+    float cos_angle = std::cos(rotation_angle * MY_PI / 180);
 
     rotation_matrix <<
         cos_angle, -sin_angle, 0, 0,
@@ -42,30 +42,51 @@ Eigen::Matrix4f get_model_matrix(float rotation_angle)
 Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio,
                                       float zNear, float zFar)
 {
-    Eigen::Matrix4f projection = Eigen::Matrix4f::Identity();
+    Eigen::Matrix4f projection;
+    Eigen::Matrix4f perspective_projection;
+    Eigen::Matrix4f orthographic_projection;
 
-    float a = 1 / (std::tan(eye_fov / 2) * aspect_ratio);
-    float b = 1 / std::tan(eye_fov / 2);
-    float c = -(zFar + zNear) / (zFar - zNear);
-    float d = -2 * zFar * zNear / (zFar - zNear);
+    //计算透视投影矩阵
+    perspective_projection <<
+        -zNear, 0, 0, 0,
+        0, -zNear, 0, 0,
+        0, 0, -(zNear + zFar), zNear * zFar,
+        0, 0, 1, 0;
 
-    projection <<
-        a, 0, 0, 0,
-        0, b, 0, 0,
-        0, 0, c, d,
-        0, 0, -1, 0;
 
-    return projection;
+    /*Eigen::Matrix4f perspective_projection;
+
+    float q = 1.0f / std::tan(eye_fov * MY_PI / 180 / 2);
+
+    perspective_projection <<
+        q / aspect_ratio, 0, 0, 0,
+        0, q, 0, 0,
+        0, 0, (zNear + zFar) / (zNear - zFar), 2 * zNear * zFar / (zNear - zFar),
+        0, 0, -1, 0;*/
+
+    return perspective_projection;
 }
 
 Eigen::Matrix4f get_rotation(Eigen::Vector3f axis, float angle)
 {
-    Eigen::Matrix4f rotation = Eigen::Matrix4f::Identity();
+    float radian_angle = angle * MY_PI / 180;
 
-    axis.normalize();
+    Eigen::Vector3f normalized_axis = axis.normalized();
+    Eigen::Matrix3f outer_product = normalized_axis * normalized_axis.transpose();
+    Eigen::Matrix3f cross_product_matrix;
+    cross_product_matrix <<
+        0, -normalized_axis.z(), normalized_axis.y(),
+        normalized_axis.z(), 0, -normalized_axis.x(),
+        -normalized_axis.y(), normalized_axis.x(), 0;
 
-    return rotation;
+    Eigen::Matrix3f rotation_3f = Eigen::Matrix3f::Identity() * std::cos(radian_angle) +
+        outer_product * (1 - std::cos(radian_angle)) +
+        cross_product_matrix * std::sin(radian_angle);
 
+    Eigen::Matrix4f rotation_4f = Eigen::Matrix4f::Identity();
+    rotation_4f.block<3, 3>(0, 0) = rotation_3f;
+
+    return rotation_4f;
 }
 
 int main(int argc, const char** argv)
@@ -116,8 +137,8 @@ int main(int argc, const char** argv)
 
     while (key != 27) {
         r.clear(rst::Buffers::Color | rst::Buffers::Depth);
-
-        r.set_model(get_model_matrix(angle));
+             
+        r.set_model(get_rotation(Eigen::Vector3f(1, 1, 1), angle));
         r.set_view(get_view_matrix(eye_pos));
         r.set_projection(get_projection_matrix(45, 1, 0.1, 50));
 
