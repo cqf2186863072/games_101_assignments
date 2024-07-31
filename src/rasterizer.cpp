@@ -280,7 +280,41 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
     // Use: Instead of passing the triangle's color directly to the frame buffer, pass the color to the shaders first to get the final color;
     // Use: auto pixel_color = fragment_shader(payload);
 
- 
+    auto v = t.toVector4();
+
+    int left = std::min(std::min(v[0].x(), v[1].x()), v[2].x());
+    int right = std::max(std::max(v[0].x(), v[1].x()), v[2].x());
+    int top = std::max(std::max(v[0].y(), v[1].y()), v[2].y());
+    int bottom = std::min(std::min(v[0].y(), v[1].y()), v[2].y());
+
+    for (int x = left; x <= right; x++) {
+        for (int y = top; y >= bottom; y--) {
+            if (!insideTriangle(x, y, t.v)) {
+                continue;
+            }
+
+            auto [alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
+            float w_reciprocal = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+            float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+            z_interpolated *= w_reciprocal;
+
+            if (z_interpolated > depth_buf[(height - 1 - y) * width + x]) {
+                continue;
+            }
+
+            auto color_interpolated = alpha * t.color[0] + beta * t.color[1] + gamma * t.color[2];
+            auto normal_interpolated = alpha * t.normal[0] + beta * t.normal[1] + gamma * t.normal[2];
+            auto texcoords_interpolated = alpha * t.tex_coords[0] + beta * t.tex_coords[1] + gamma * t.tex_coords[2];
+            auto shadingcoords_interpolated = alpha * view_pos[0] + beta * view_pos[1] + gamma * view_pos[2];
+
+            fragment_shader_payload payload(color_interpolated, normal_interpolated.normalized(), texcoords_interpolated, texture ? &*texture : nullptr);
+            payload.view_pos = shadingcoords_interpolated;
+            auto pixel_color = fragment_shader(payload);
+
+            set_pixel(Eigen::Vector3f(x, y, 0), pixel_color);
+            depth_buf[(height - 1 - y) * width + x] = z_interpolated;
+        }
+    }
 }
 
 void rst::rasterizer::set_model(const Eigen::Matrix4f& m)
