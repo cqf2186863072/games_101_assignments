@@ -229,15 +229,49 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
     // Position p = p + kn * n * h(u,v)
     // Normal n = normalize(TBN * ln)
 
+    Eigen::Vector3f t = Eigen::Vector3f(
+        normal.x() * normal.y() / sqrt(normal.x() * normal.x() + normal.z() * normal.z()),
+        sqrt(normal.x() * normal.x() + normal.z() * normal.z()),
+        normal.z() * normal.y() / sqrt(normal.x() * normal.x() + normal.z() * normal.z())
+    );
+
+    Eigen::Vector3f b = normal.cross(t);
+
+    Eigen::Matrix3f TBN;
+    TBN << t, b, normal;
+
+    float dU = kh * kn * (payload.texture->getColor(payload.tex_coords[0] + 1.0 / payload.texture->width, payload.tex_coords[1]).norm() - payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm());
+    float dV = kh * kn * (payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y() + 1.0 / payload.texture->height).norm() - payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm());
+
+    Eigen::Vector3f ln = Eigen::Vector3f(-dU, -dV, 1);
+
+    float displacement = kn * payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm();
+    point = point + normal * displacement;
+
+    normal = (TBN * ln).normalized();
 
     Eigen::Vector3f result_color = {0, 0, 0};
 
     for (auto& light : lights)
     {
-        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
-        // components are. Then, accumulate that result on the *result_color* object.
+        Eigen::Vector3f light_dir = light.position - point;
+        float light_distance = light_dir.norm();
+        light_dir.normalize();
 
+        //ambient
+        Eigen::Vector3f ambient = ka.cwiseProduct(amb_light_intensity);
 
+        //diffuse
+        float dot_ln = std::max(0.f, normal.dot(light_dir));
+        Eigen::Vector3f diffuse = kd.cwiseProduct(light.intensity / (light_distance * light_distance)) * dot_ln;
+
+        //specular
+        Eigen::Vector3f view_dir = (eye_pos - point).normalized();
+        Eigen::Vector3f half_way = (light_dir + view_dir).normalized();
+        float dot_nh = std::max(0.f, normal.dot(half_way));
+        Eigen::Vector3f specular = ks.cwiseProduct(light.intensity / (light_distance * light_distance)) * std::pow(dot_nh, p);
+
+        result_color += ambient + diffuse + specular;
     }
 
     return result_color * 255.f;
@@ -277,9 +311,47 @@ Eigen::Vector3f bump_fragment_shader(const fragment_shader_payload& payload)
     // Vector ln = (-dU, -dV, 1)
     // Normal n = normalize(TBN * ln)
 
+    Eigen::Vector3f t = Eigen::Vector3f(
+        normal.x() * normal.y() / sqrt(normal.x() * normal.x() + normal.z() * normal.z()),
+        sqrt(normal.x() * normal.x() + normal.z() * normal.z()),
+        normal.z() * normal.y() / sqrt(normal.x() * normal.x() + normal.z() * normal.z())
+    );
+
+    Eigen::Vector3f b = normal.cross(t);
+
+    Eigen::Matrix3f TBN;
+    TBN << t, b, normal;
+
+    float dU = kh * kn * (payload.texture->getColor(payload.tex_coords[0] + 1.0 / payload.texture->width, payload.tex_coords[1]).norm() - payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm());
+    float dV = kh * kn * (payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y() + 1.0 / payload.texture->height).norm() - payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y()).norm());
+
+    Eigen::Vector3f ln = Eigen::Vector3f(-dU, -dV, 1);
+    normal = (TBN * ln).normalized();
 
     Eigen::Vector3f result_color = {0, 0, 0};
     result_color = normal;
+
+    for (auto& light : lights)
+    {
+        Eigen::Vector3f light_dir = light.position - point;
+        float light_distance = light_dir.norm();
+        light_dir.normalize();
+
+        //ambient
+        Eigen::Vector3f ambient = ka.cwiseProduct(amb_light_intensity);
+
+        //diffuse
+        float dot_ln = std::max(0.f, normal.dot(light_dir));
+        Eigen::Vector3f diffuse = kd.cwiseProduct(light.intensity / (light_distance * light_distance)) * dot_ln;
+
+        //specular
+        Eigen::Vector3f view_dir = (eye_pos - point).normalized();
+        Eigen::Vector3f half_way = (light_dir + view_dir).normalized();
+        float dot_nh = std::max(0.f, normal.dot(half_way));
+        Eigen::Vector3f specular = ks.cwiseProduct(light.intensity / (light_distance * light_distance)) * std::pow(dot_nh, p);
+
+        result_color += ambient + diffuse + specular;
+    }
 
     return result_color * 255.f;
 }
@@ -291,12 +363,20 @@ int main(int argc, const char** argv)
     float angle = 140.0;
     bool command_line = false;
 
+    //std::string filename = "output.png";
+    //objl::Loader Loader;
+    //std::string obj_path = "../models/spot/";
+
+    //// Load .obj File
+    //bool loadout = Loader.LoadFile("../models/spot/spot_triangulated_good.obj");
+
     std::string filename = "output.png";
     objl::Loader Loader;
-    std::string obj_path = "../models/spot/";
+    std::string obj_path = "E:\\Projects\\games_101_assignments\\src\\models\\spot\\";
 
     // Load .obj File
-    bool loadout = Loader.LoadFile("../models/spot/spot_triangulated_good.obj");
+    bool loadout = Loader.LoadFile("E:\\Projects\\games_101_assignments\\src\\models\\spot\\spot_triangulated_good.obj");
+
     for(auto mesh:Loader.LoadedMeshes)
     {
         for(int i=0;i<mesh.Vertices.size();i+=3)
@@ -317,7 +397,7 @@ int main(int argc, const char** argv)
     auto texture_path = "hmap.jpg";
     r.set_texture(Texture(obj_path + texture_path));
 
-    std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = phong_fragment_shader;
+    std::function<Eigen::Vector3f(fragment_shader_payload)> active_shader = displacement_fragment_shader;
 
     if (argc >= 2)
     {
