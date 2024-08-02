@@ -1,163 +1,98 @@
-#include "Triangle.hpp"
-#include "rasterizer.hpp"
-#include <Eigen/Eigen>
+#include <chrono>
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
-constexpr double MY_PI = 3.1415926;
+std::vector<cv::Point2f> control_points;
 
-Eigen::Matrix4f get_view_matrix(Eigen::Vector3f eye_pos)
+void mouse_handler(int event, int x, int y, int flags, void *userdata) 
 {
-    Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
-
-    Eigen::Matrix4f translate;
-    translate << 1, 0, 0, -eye_pos[0], 0, 1, 0, -eye_pos[1], 0, 0, 1,
-        -eye_pos[2], 0, 0, 0, 1;
-
-    view = translate * view;
-
-    return view;
+    if (event == cv::EVENT_LBUTTONDOWN && control_points.size() < 4) 
+    {
+        std::cout << "Left button of the mouse is clicked - position (" << x << ", "
+        << y << ")" << '\n';
+        control_points.emplace_back(x, y);
+    }     
 }
 
-Eigen::Matrix4f get_model_matrix(float rotation_angle)
+void naive_bezier(const std::vector<cv::Point2f> &points, cv::Mat &window) 
 {
-    Eigen::Matrix4f model = Eigen::Matrix4f::Identity();
+    auto &p_0 = points[0];
+    auto &p_1 = points[1];
+    auto &p_2 = points[2];
+    auto &p_3 = points[3];
 
-    Eigen::Matrix4f rotation_matrix;
+    for (double t = 0.0; t <= 1.0; t += 0.001) 
+    {
+        auto point = std::pow(1 - t, 3) * p_0 + 3 * t * std::pow(1 - t, 2) * p_1 +
+                 3 * std::pow(t, 2) * (1 - t) * p_2 + std::pow(t, 3) * p_3;
 
-    float sin_angle = std::sin(rotation_angle * MY_PI / 180);
-    float cos_angle = std::cos(rotation_angle * MY_PI / 180);
-
-    rotation_matrix <<
-        cos_angle, -sin_angle, 0, 0,
-        sin_angle, cos_angle, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1;
-
-    model = model * rotation_matrix;
-
-    return model;
+        window.at<cv::Vec3b>(point.y, point.x)[2] = 255;
+    }
 }
 
-Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio,
-                                      float zNear, float zFar)
+cv::Point2f recursive_bezier(const std::vector<cv::Point2f> &control_points, float t) 
 {
-    Eigen::Matrix4f projection;
-    Eigen::Matrix4f perspective_projection;
-    Eigen::Matrix4f orthographic_projection;
+    // TODO: Implement de Casteljau's algorithm
 
-    //计算透视投影矩阵
-    perspective_projection <<
-        -zNear, 0, 0, 0,
-        0, -zNear, 0, 0,
-        0, 0, -(zNear + zFar), zNear * zFar,
-        0, 0, 1, 0;
+    std::vector<cv::Point2f> points(control_points);
 
-
-    /*Eigen::Matrix4f perspective_projection;
-
-    float q = 1.0f / std::tan(eye_fov * MY_PI / 180 / 2);
-
-    perspective_projection <<
-        q / aspect_ratio, 0, 0, 0,
-        0, q, 0, 0,
-        0, 0, (zNear + zFar) / (zNear - zFar), 2 * zNear * zFar / (zNear - zFar),
-        0, 0, -1, 0;*/
-
-    return perspective_projection;
-}
-
-Eigen::Matrix4f get_rotation(Eigen::Vector3f axis, float angle)
-{
-    float radian_angle = angle * MY_PI / 180;
-
-    Eigen::Vector3f normalized_axis = axis.normalized();
-    Eigen::Matrix3f outer_product = normalized_axis * normalized_axis.transpose();
-    Eigen::Matrix3f cross_product_matrix;
-    cross_product_matrix <<
-        0, -normalized_axis.z(), normalized_axis.y(),
-        normalized_axis.z(), 0, -normalized_axis.x(),
-        -normalized_axis.y(), normalized_axis.x(), 0;
-
-    Eigen::Matrix3f rotation_3f = Eigen::Matrix3f::Identity() * std::cos(radian_angle) +
-        outer_product * (1 - std::cos(radian_angle)) +
-        cross_product_matrix * std::sin(radian_angle);
-
-    Eigen::Matrix4f rotation_4f = Eigen::Matrix4f::Identity();
-    rotation_4f.block<3, 3>(0, 0) = rotation_3f;
-
-    return rotation_4f;
-}
-
-int main(int argc, const char** argv)
-{
-    float angle = 0;
-    bool command_line = false;
-    std::string filename = "output.png";
-
-    if (argc >= 3) {
-        command_line = true;
-        angle = std::stof(argv[2]); // -r by default
-        if (argc == 4) {
-            filename = std::string(argv[3]);
+    int n = points.size();
+    while (n > 1) {
+        n--;
+        for (int i = 0; i < n; i++) {
+            points[i] = t * points[i + 1] + (1 - t) * points[i];
         }
-        else
+        points.resize(n);
+    }
+
+    return points[0];
+}
+
+void bezier(const std::vector<cv::Point2f> &control_points, cv::Mat &window) 
+{
+    // TODO: Iterate through all t = 0 to t = 1 with small steps, and call de Casteljau's 
+    // recursive Bezier algorithm.
+
+    float dt = 0.001;
+
+    for (float t = 0; t <= 1; t += dt) {
+        cv::Point2f p = recursive_bezier(control_points, t);
+        window.at<cv::Vec3b>(p.y, p.x)[1] = 255;
+        std::cout << t;
+    }
+}
+
+int main() 
+{
+    cv::Mat window = cv::Mat(700, 700, CV_8UC3, cv::Scalar(0));
+    cv::cvtColor(window, window, cv::COLOR_BGR2RGB);
+    cv::namedWindow("Bezier Curve", cv::WINDOW_AUTOSIZE);
+
+    cv::setMouseCallback("Bezier Curve", mouse_handler, nullptr);
+
+    int key = -1;
+    while (key != 27) 
+    {
+        for (auto &point : control_points) 
+        {
+            cv::circle(window, point, 3, {255, 255, 255}, 3);
+        }
+
+        if (control_points.size() == 4) 
+        {
+            naive_bezier(control_points, window);
+            bezier(control_points, window);
+
+            cv::imshow("Bezier Curve", window);
+            cv::imwrite("my_bezier_curve.png", window);
+            key = cv::waitKey(0);
+
             return 0;
-    }
-
-    rst::rasterizer r(700, 700);
-
-    Eigen::Vector3f eye_pos = {0, 0, 5};
-
-    std::vector<Eigen::Vector3f> pos{{2, 0, -2}, {0, 2, -2}, {-2, 0, -2}};
-
-    std::vector<Eigen::Vector3i> ind{{0, 1, 2}};
-
-    auto pos_id = r.load_positions(pos);
-    auto ind_id = r.load_indices(ind);
-
-    int key = 0;
-    int frame_count = 0;
-
-    if (command_line) {
-        r.clear(rst::Buffers::Color | rst::Buffers::Depth);
-
-        r.set_model(get_model_matrix(angle));
-        r.set_view(get_view_matrix(eye_pos));
-        r.set_projection(get_projection_matrix(45, 1, 0.1, 50));
-
-        r.draw(pos_id, ind_id, rst::Primitive::Triangle);
-        cv::Mat image(700, 700, CV_32FC3, r.frame_buffer().data());
-        image.convertTo(image, CV_8UC3, 1.0f);
-
-        cv::imwrite(filename, image);
-
-        return 0;
-    }
-
-    while (key != 27) {
-        r.clear(rst::Buffers::Color | rst::Buffers::Depth);
-             
-        r.set_model(get_rotation(Eigen::Vector3f(1, 1, 1), angle));
-        r.set_view(get_view_matrix(eye_pos));
-        r.set_projection(get_projection_matrix(45, 1, 0.1, 50));
-
-        r.draw(pos_id, ind_id, rst::Primitive::Triangle);
-
-        cv::Mat image(700, 700, CV_32FC3, r.frame_buffer().data());
-        image.convertTo(image, CV_8UC3, 1.0f);
-        cv::imshow("image", image);
-        key = cv::waitKey(10);
-
-        std::cout << "frame count: " << frame_count++ << '\n';
-
-        if (key == 'a') {
-            angle += 10;
         }
-        else if (key == 'd') {
-            angle -= 10;
-        }
+
+        cv::imshow("Bezier Curve", window);
+        key = cv::waitKey(20);
     }
 
-    return 0;
+return 0;
 }
