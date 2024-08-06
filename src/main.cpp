@@ -30,10 +30,35 @@ void naive_bezier(const std::vector<cv::Point2f> &points, cv::Mat &window)
     }
 }
 
-cv::Point2f recursive_bezier(const std::vector<cv::Point2f> &control_points, float t) 
-{
-    // TODO: Implement de Casteljau's algorithm
+void draw(cv::Point2f p, cv::Mat& window, cv::Vec3b color) {
+    int radius = 1;
+    cv::Vec3f normalized_color = color / 255.0;
 
+    int x = static_cast<int>(p.x);
+    int y = static_cast<int>(p.y);
+
+    int x_min = std::max(0, x - radius);
+    int x_max = std::min(window.cols - 1, x + radius);
+    int y_min = std::max(0, y - radius);
+    int y_max = std::min(window.rows - 1, y + radius);
+
+    for (int i = x_min; i < x_max + 1; i++) {
+        for (int j = y_min; j < y_max + 1; j++) {
+            // 使用欧氏距离计算距离
+            float dist_squared = std::pow(i - p.x, 2) + std::pow(j - p.y, 2);
+            // 使用距离计算衰减因子
+            float factor = std::max(0.f, 1 - dist_squared / (radius * radius));
+
+            for (int k = 0; k < 3; k++) {
+                float new_color = (1 - factor) * window.at<cv::Vec3b>(j, i)[k] + factor * color[k];
+                window.at<cv::Vec3b>(j, i)[k] = static_cast<uchar>(new_color);
+            }
+        }
+    }
+}
+
+cv::Point2f recursive_bezier(const std::vector<cv::Point2f>& control_points, float t)
+{
     std::vector<cv::Point2f> points(control_points);
 
     int n = points.size();
@@ -48,17 +73,16 @@ cv::Point2f recursive_bezier(const std::vector<cv::Point2f> &control_points, flo
     return points[0];
 }
 
-void bezier(const std::vector<cv::Point2f> &control_points, cv::Mat &window) 
+void bezier(const std::vector<cv::Point2f>& control_points, cv::Mat& window)
 {
-    // TODO: Iterate through all t = 0 to t = 1 with small steps, and call de Casteljau's 
-    // recursive Bezier algorithm.
-
-    float dt = 0.001;
+    float dt = 0.0005;
+    cv::Vec3b color = (255, 0, 255);
 
     for (float t = 0; t <= 1; t += dt) {
         cv::Point2f p = recursive_bezier(control_points, t);
-        window.at<cv::Vec3b>(p.y, p.x)[1] = 255;
-        std::cout << t;
+        //window.at<cv::Vec3b>(p.y, p.x)[2] = 255;
+        
+        draw(p, window, color);
     }
 }
 
@@ -80,7 +104,7 @@ int main()
 
         if (control_points.size() == 4) 
         {
-            naive_bezier(control_points, window);
+            //naive_bezier(control_points, window);
             bezier(control_points, window);
 
             cv::imshow("Bezier Curve", window);
