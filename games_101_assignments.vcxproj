@@ -20,16 +20,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\rasterizer.cpp" />
     <ClCompile Include="src\Renderer.cpp" />
     <ClCompile Include="src\Scene.cpp" />
-    <ClCompile Include="src\Triangle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\global.hpp" />
     <ClInclude Include="src\Light.hpp" />
     <ClInclude Include="src\Object.hpp" />
-    <ClInclude Include="src\rasterizer.hpp" />
     <ClInclude Include="src\Renderer.hpp" />
     <ClInclude Include="src\Scene.hpp" />
     <ClInclude Include="src\Sphere.hpp" />
