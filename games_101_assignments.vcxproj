@@ -18,6 +18,30 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\AreaLight.hpp" />
+    <ClInclude Include="src\Bounds3.hpp" />
+    <ClInclude Include="src\BVH.hpp" />
+    <ClInclude Include="src\global.hpp" />
+    <ClInclude Include="src\Intersection.hpp" />
+    <ClInclude Include="src\Light.hpp" />
+    <ClInclude Include="src\Material.hpp" />
+    <ClInclude Include="src\Object.hpp" />
+    <ClInclude Include="src\OBJ_Loader.hpp" />
+    <ClInclude Include="src\Ray.hpp" />
+    <ClInclude Include="src\Renderer.hpp" />
+    <ClInclude Include="src\Scene.hpp" />
+    <ClInclude Include="src\Sphere.hpp" />
+    <ClInclude Include="src\Triangle.hpp" />
+    <ClInclude Include="src\Vector.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\BVH.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Renderer.cpp" />
+    <ClCompile Include="src\Scene.cpp" />
+    <ClCompile Include="src\Vector.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <ProjectGuid>{B46A1EA0-38F0-4041-A094-D33BA84E7D58}</ProjectGuid>
@@ -122,15 +146,6 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\rasterizer.cpp" />
-    <ClCompile Include="src\Triangle.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="src\rasterizer.hpp" />
-    <ClInclude Include="src\Triangle.hpp" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
